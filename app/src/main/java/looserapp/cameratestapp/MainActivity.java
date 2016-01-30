@@ -1,6 +1,10 @@
 package looserapp.cameratestapp;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.net.Uri;
 import android.os.Bundle;
@@ -64,6 +68,10 @@ public class MainActivity extends Activity {
         Camera camera = null;
         try {
             camera = Camera.open();
+            Camera.Parameters param=camera.getParameters();
+            param.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+            param.set("rawsave-mode", "1");
+            param.setPictureFormat(ImageFormat.RGB_565);
         } catch (Exception e) {
             // cannot get camera or does not exist
         }
@@ -73,17 +81,30 @@ public class MainActivity extends Activity {
     Camera.PictureCallback mPicture = new Camera.PictureCallback() {
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
-            File pictureFile = getOutputMediaFile();
-            if (pictureFile == null) {
-                return;
-            }
-            try {
-                FileOutputStream fos = new FileOutputStream(pictureFile);
-                fos.write(data);
-                fos.close();
-            } catch (FileNotFoundException e) {
 
-            } catch (IOException e) {
+            Bitmap bm = BitmapFactory.decodeByteArray(data, 0, data.length);
+            if ((bm.getWidth() > 200) && (bm.getHeight() > 200))
+            {
+                int lum = Color.red(bm.getPixel(50, 50));
+                lum += Color.red(bm.getPixel(100, 100));
+                lum += Color.red(bm.getPixel(150, 150));
+                lum += Color.red(bm.getPixel(200, 200));
+                lum += Color.green(bm.getPixel(50, 50));
+                lum += Color.green(bm.getPixel(100, 100));
+                lum += Color.green(bm.getPixel(150, 150));
+                lum += Color.green(bm.getPixel(200, 200));
+                lum += Color.blue(bm.getPixel(50, 50));
+                lum += Color.blue(bm.getPixel(100, 100));
+                lum += Color.blue(bm.getPixel(150, 150));
+                lum += Color.blue(bm.getPixel(200, 200));
+                lum = lum/12;
+
+                if (lum<50)
+                    Log.d("MyCameraApp", "dark");
+                else
+                    Log.d("MyCameraApp", "light");
+
+                //camready = true;
             }
         }
     };
