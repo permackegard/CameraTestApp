@@ -5,11 +5,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -28,29 +31,79 @@ import java.util.Date;
 public class MainActivity extends Activity {
     private Camera mCamera;
     private CameraPreview mCameraPreview;
+    Button captureButton;
+    static boolean isTimerStarted = false;
+    static int prevLum = 0;
+    static int cntPicutres = 0;
+    static int lightLum = 0;
+    private SurfaceTextureManager mStManager;
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
      */
     private GoogleApiClient client;
+    long startTime = 0;
 
     /**
      * Called when the activity is first created.
      */
+    //runs without a timer by reposting this handler at the end of the runnable
+    Handler timerHandler = new Handler();
+    Runnable timerRunnable = new Runnable() {
+
+        @Override
+        public void run() {
+          //  long millis = System.currentTimeMillis() - startTime;
+           // int seconds = (int) (millis / 1000);
+          //  int minutes = seconds / 60;
+          //  seconds = seconds % 60;
+
+            mCamera.takePicture(null, null, mPicture);
+
+            timerHandler.postDelayed(timerRunnable, 900);
+
+
+        }
+    };
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mCamera = getCameraInstance();
-        mCameraPreview = new CameraPreview(this, mCamera);
-        FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
-        preview.addView(mCameraPreview);
+        //mCameraPreview = new CameraPreview(this, mCamera);
 
-        Button captureButton = (Button) findViewById(R.id.button_capture);
+
+        SurfaceView dummy=new SurfaceView(this);
+        try {
+            mCamera.setPreviewDisplay(dummy.getHolder());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        mCamera.startPreview();
+
+        mStManager = new SurfaceTextureManager();
+        SurfaceTexture st = mStManager.getSurfaceTexture();
+        try {
+            mCamera.setPreviewTexture(st);
+        } catch (IOException ioe) {
+            throw new RuntimeException("setPreviewTexture failed", ioe);
+        }
+
+        //mCameraPreview = new CameraPreview(this, mCamera);
+        //FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
+       // preview.addView(mCameraPreview);
+
+        captureButton = (Button) findViewById(R.id.button_capture);
         captureButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mCamera.takePicture(null, null, mPicture);
+                //mCamera.takePicture(null, null, mPicture);
+                if( !isTimerStarted )
+                {
+                    timerRunnable.run();
+                    isTimerStarted = true;
+                }
             }
         });
         // ATTENTION: This was auto-generated to implement the App Indexing API.
@@ -99,10 +152,26 @@ public class MainActivity extends Activity {
                 lum += Color.blue(bm.getPixel(200, 200));
                 lum = lum/12;
 
-                if (lum<50)
-                    Log.d("MyCameraApp", "dark");
+                if( cntPicutres < 10 )
+                {
+                    lightLum += lum;
+                    cntPicutres++;
+                }
                 else
-                    Log.d("MyCameraApp", "light");
+                {
+                    if( lum < ( (lightLum * 5)/100)  )
+                    {
+                        Log.d("MyCameraApp", "dark");
+                        captureButton.setText("Looser detected!");
+                        captureButton.setBackgroundColor(Color.RED);
+                    }
+                    else
+                    {
+                        Log.d("MyCameraApp", "ligh");
+                        captureButton.setText("Searching...");
+                        captureButton.setBackgroundColor(Color.GREEN);
+                    }
+                }
 
                 //camready = true;
             }
@@ -171,6 +240,14 @@ public class MainActivity extends Activity {
         );
         AppIndex.AppIndexApi.end(client, viewAction);
         client.disconnect();
+        captureButton.setText("Start looser detection!");
+        timerHandler.removeCallbacks(timerRunnable);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        //timerHandler.removeCallbacks(timerRunnable);
     }
 }
 
